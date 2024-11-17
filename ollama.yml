@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: ollama
+  template:
+    metadata:
+      labels:
+        name: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: ollama/ollama:0.3.5
+        ports:
+        - name: http
+          containerPort: 11434
+          protocol: TCP
+        env:
+        - name: PRELOAD_MODELS
+          value: "llama3.1"
+        - name: OLLAMA_KEEP_ALIVE
+          value: "12h"
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "for model in $PRELOAD_MODELS; do ollama run $model \"\"; done"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: ollama
+spec:
+  type: ClusterIP
+  selector:
+    name: ollama
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+    protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webui
+  namespace: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: webui
+  template:
+    metadata:
+      labels:
+        name: webui
+    spec:
+      volumes:
+      containers:
+        - name: webui
+          image: ghcr.io/open-webui/open-webui:main
+          env:
+            - name: OLLAMA_BASE_URLS
+              value: "http://ollama"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webui
+  namespace: ollama
+spec:
+  type: ClusterIP
+  selector:
+    name: webui
+  ports:
+  - port: 80
+    name: http
+    targetPort: http
+    protocol: TCP
